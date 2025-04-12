@@ -105,65 +105,107 @@ static int kernel_module_allocate_single_page(unsigned long vaddr, bool write,
   //  4. Get PMD, if not mapped call memalloc_pte_alloc().
   //  5. Get PTE and check if it's already present. If so, return -1.
 
-  pgd = pgd_offset(current->mm, vaddr);
-  if (pgd_none(*pgd)) {
-    printk(
-        "Error: pgd should always be mapped (something is really wrong!).\n");
-    goto not_in_memory;
-  }
-  printk("PGD is allocated. \n");
-
-  /* Return pointer to the P4D. pgd is the pointer of PGD, address is the
-     logical address in the virtual memory space.*/
-  p4d = p4d_offset(pgd, vaddr);
-  if (p4d_none(*p4d) || p4d_bad(*p4d)) {
-    // printk("No P4D allocated; page must be unmapped.");
-    // goto not_in_memory;
-    memalloc_pud_alloc(p4d, vaddr);
-    p4d = p4d_offset(pgd, vaddr);
-  }
-  printk("P4D is allocated. \n");
-
-  /* Return pointer to the PUD. p4d is the pointer of P4D, address is the
-     logical address in the virtual memory space.*/
-  pud = pud_offset(p4d, vaddr);
-  if (pud_none(*pud)) {
-    // printk("No PUD allocated; page must be unmapped.");
-    // goto not_in_memory;
-    memalloc_pmd_alloc(pud, vaddr);
-    pud = pud_offset(p4d, vaddr);
-  }
-  printk("PUD is allocated. \n");
-
-  /* Return pointer to the PMD. pud is the pointer of PUD, address is the
-     logical address in the virtual memory space.*/
-  pmd = pmd_offset(pud, vaddr);
-  if (pmd_none(*pmd)) {
-    // printk("No PMD allocated; page must be unmapped.");
-    // goto not_in_memory;
-    memalloc_pte_alloc(pmd, vaddr);
-    pmd = pmd_offset(pud, vaddr);
-  }
-  printk("PMD is allocated. \n");
-
-  /* Return pointer to the PTE. pmd is the pointer of PMD, address is the
-     logical address in the virtual memory space*/
-  //***
-  pte = pte_offset_kernel(pmd, vaddr);
-  if (pte_none(*pte)) {
-    printk("No PTE allocated; page must be unmapped.");
-    goto not_in_memory;
-  }
-  printk("PTE is allocated. \n");
-
-  if (pte_present(*pte)) {
-    printk("Page is mapped.\n");
-    return -1;
-  }
+  // pgd = pgd_offset(current->mm, vaddr);
+  // if (pgd_none(*pgd)) {
+  //   printk(
+  //       "Error: pgd should always be mapped (something is really
+  //       wrong!).\n");
+  //   goto not_in_memory;
+  // }
+  // printk("PGD is allocated. \n");
+  //
+  // /* Return pointer to the P4D. pgd is the pointer of PGD, address is the
+  //    logical address in the virtual memory space.*/
+  // p4d = p4d_offset(pgd, vaddr);
+  // if (p4d_none(*p4d) || p4d_bad(*p4d)) {
+  //   // printk("No P4D allocated; page must be unmapped.");
+  //   // goto not_in_memory;
+  //   memalloc_pud_alloc(p4d, vaddr);
+  //   p4d = p4d_offset(pgd, vaddr);
+  // }
+  // printk("P4D is allocated. \n");
+  //
+  // /* Return pointer to the PUD. p4d is the pointer of P4D, address is the
+  //    logical address in the virtual memory space.*/
+  // pud = pud_offset(p4d, vaddr);
+  // if (pud_none(*pud)) {
+  //   // printk("No PUD allocated; page must be unmapped.");
+  //   // goto not_in_memory;
+  //   memalloc_pmd_alloc(pud, vaddr);
+  //   pud = pud_offset(p4d, vaddr);
+  // }
+  // printk("PUD is allocated. \n");
+  //
+  // /* Return pointer to the PMD. pud is the pointer of PUD, address is the
+  //    logical address in the virtual memory space.*/
+  // pmd = pmd_offset(pud, vaddr);
+  // if (pmd_none(*pmd)) {
+  //   // printk("No PMD allocated; page must be unmapped.");
+  //   // goto not_in_memory;
+  //   memalloc_pte_alloc(pmd, vaddr);
+  //   pmd = pmd_offset(pud, vaddr);
+  // }
+  // printk("PMD is allocated. \n");
+  //
+  // /* Return pointer to the PTE. pmd is the pointer of PMD, address is the
+  //    logical address in the virtual memory space*/
+  // //***
+  // pte = pte_offset_kernel(pmd, vaddr);
+  // if (pte_none(*pte)) {
+  //   printk("No PTE allocated; page must be unmapped.");
+  //   goto not_in_memory;
+  // }
+  // printk("PTE is allocated. \n");
+  //
+  // if (pte_present(*pte)) {
+  //   printk("Page is mapped.\n");
+  //   return -1;
+  // }
   // else {
   //   printk("Page is not mapped. \n"); // Get a free page for the process
   //   goto not_in_memory;
   // }
+
+  /* Get the page global directory */
+  pgd = pgd_offset(current->mm, vaddr);
+  if (pgd_none(*pgd)) {
+    printk(KERN_ERR "PGD not found for address %lx\n", vaddr);
+    return -1;
+  }
+
+  /* Get the p4d (4-level page directory) */
+  p4d = p4d_offset(pgd, vaddr);
+  if (p4d_none(*p4d)) {
+    printk(KERN_INFO "P4D not mapped, calling memalloc_pud_alloc\n");
+    memalloc_pud_alloc(p4d, vaddr);
+  }
+
+  /* Get the page upper directory */
+  pud = pud_offset(p4d, vaddr);
+  if (pud_none(*pud)) {
+    printk(KERN_INFO "PUD not mapped, calling memalloc_pmd_alloc\n");
+    memalloc_pmd_alloc(pud, vaddr);
+  }
+
+  /* Get the page middle directory */
+  pmd = pmd_offset(pud, vaddr);
+  if (pmd_none(*pmd)) {
+    printk(KERN_INFO "PMD not mapped, calling memalloc_pte_alloc\n");
+    memalloc_pte_alloc(pmd, vaddr);
+  }
+
+  /* Get the page table entry */
+  pte = pte_offset_kernel(pmd, vaddr);
+  if (pte_none(*pte)) {
+    printk(KERN_INFO "PTE not present, will allocate new page\n");
+  } else if (pte_present(*pte)) {
+    /* The page is already mapped, return error */
+    printk(KERN_ERR "Page already mapped at address %lx\n", vaddr);
+    return -1;
+  }
+
+  /* If we reached here, we need to allocate a new page */
+  goto not_in_memory;
 
   // gfp_t gfp = GFP_KERNEL_ACCOUNT;
   // void *virt_addr = (void*) get_zeroed_page(gfp);
@@ -225,62 +267,111 @@ static int kernel_module_free_single_page(unsigned long vaddr) {
   //  and return -1.
   //  4. If valid, clear the PTE.
 
-  printk("entered freeSinglePage with %lu\n", vaddr);
+  // printk("entered freeSinglePage with %lu\n", vaddr);
+  // pgd = pgd_offset(current->mm, vaddr);
+  // if (pgd_none(*pgd)) {
+  //   printk(
+  //       "Error: pgd should always be mapped (something is really
+  //       wrong!).\n");
+  //   return -1;
+  // }
+  // // printk("PGD is allocated. \n");
+  //
+  // /* Return pointer to the P4D. pgd is the pointer of PGD, address is the
+  //    logical address in the virtual memory space.*/
+  // p4d = p4d_offset(pgd, vaddr);
+  // if (p4d_none(*p4d) || p4d_bad(*p4d)) {
+  //   // printk("No P4D allocated; page must be unmapped.");
+  //   // goto not_in_memory;
+  //   return -1;
+  // }
+  // // printk("P4D is allocated. \n");
+  //
+  // /* Return pointer to the PUD. p4d is the pointer of P4D, address is the
+  //    logical address in the virtual memory space.*/
+  // pud = pud_offset(p4d, vaddr);
+  // if (pud_none(*pud)) {
+  //   // printk("No PUD allocated; page must be unmapped.");
+  //   // goto not_in_memory;
+  //   return -1;
+  // }
+  // // printk("PUD is allocated. \n");
+  //
+  // /* Return pointer to the PMD. pud is the pointer of PUD, address is the
+  //    logical address in the virtual memory space.*/
+  // pmd = pmd_offset(pud, vaddr);
+  // if (pmd_none(*pmd)) {
+  //   // printk("No PMD allocated; page must be unmapped.");
+  //   // goto not_in_memory;pud_of
+  //   return -1;
+  // }
+  //
+  // // printk("PMD is allocated. \n");
+  //
+  // /* Return pointer to the PTE. pmd is the pointer of PMD, address is the
+  //    logical address in the virtual memory space*/
+  // pte = pte_offset_kernel(pmd, vaddr);
+  // if (pte_none(*pte)) {
+  //   // printk("No PTE allocated; page must be unmapped.");
+  //   // goto not_in_memory;
+  //   return -1;
+  // }
+  // // printk("PTE is allocated. \n");
+  //
+  // if (!pte_present(*pte)) {
+  //   // printk("Page is mapped.");
+  //   return -1;
+  // }
+  //
+  // pte_clear(current->mm, vaddr, pte);
+
+  /* Get the page global directory */
   pgd = pgd_offset(current->mm, vaddr);
   if (pgd_none(*pgd)) {
-    printk(
-        "Error: pgd should always be mapped (something is really wrong!).\n");
+    printk(KERN_ERR "PGD not mapped for address %lx\n", vaddr);
     return -1;
   }
-  // printk("PGD is allocated. \n");
 
-  /* Return pointer to the P4D. pgd is the pointer of PGD, address is the
-     logical address in the virtual memory space.*/
+  /* Get the p4d (4-level page directory) */
   p4d = p4d_offset(pgd, vaddr);
-  if (p4d_none(*p4d) || p4d_bad(*p4d)) {
-    // printk("No P4D allocated; page must be unmapped.");
-    // goto not_in_memory;
+  if (p4d_none(*p4d)) {
+    printk(KERN_ERR "P4D not mapped for address %lx\n", vaddr);
     return -1;
   }
-  // printk("P4D is allocated. \n");
 
-  /* Return pointer to the PUD. p4d is the pointer of P4D, address is the
-     logical address in the virtual memory space.*/
+  /* Get the page upper directory */
   pud = pud_offset(p4d, vaddr);
   if (pud_none(*pud)) {
-    // printk("No PUD allocated; page must be unmapped.");
-    // goto not_in_memory;
+    printk(KERN_ERR "PUD not mapped for address %lx\n", vaddr);
     return -1;
   }
-  // printk("PUD is allocated. \n");
 
-  /* Return pointer to the PMD. pud is the pointer of PUD, address is the
-     logical address in the virtual memory space.*/
+  /* Get the page middle directory */
   pmd = pmd_offset(pud, vaddr);
   if (pmd_none(*pmd)) {
-    // printk("No PMD allocated; page must be unmapped.");
-    // goto not_in_memory;pud_of
+    printk(KERN_ERR "PMD not mapped for address %lx\n", vaddr);
     return -1;
   }
 
-  // printk("PMD is allocated. \n");
-
-  /* Return pointer to the PTE. pmd is the pointer of PMD, address is the
-     logical address in the virtual memory space*/
+  /* Get the page table entry */
   pte = pte_offset_kernel(pmd, vaddr);
-  if (pte_none(*pte)) {
-    // printk("No PTE allocated; page must be unmapped.");
-    // goto not_in_memory;
-    return -1;
-  }
-  // printk("PTE is allocated. \n");
-
-  if (!pte_present(*pte)) {
-    // printk("Page is mapped.");
+  if (pte_none(*pte) || !pte_present(*pte)) {
+    printk(KERN_ERR "PTE not present for address %lx\n", vaddr);
     return -1;
   }
 
+  /* Get the physical address from the page table entry before clearing it */
+  struct page *pg = pte_page(*pte);
+  paddr = page_to_phys(pg);
+
+  /* Clear the page table entry */
   pte_clear(current->mm, vaddr, pte);
+
+  /* Free the page memory */
+  free_page(__va(paddr));
+
+  printk(KERN_INFO "Freed page at virtual address %lx (physical: %lx)\n", vaddr,
+         paddr);
 
   // Flush the TLB entry
 #if defined(CONFIG_X86_64)
@@ -481,40 +572,68 @@ static long memalloc_ioctl(struct file *f, unsigned int cmd,
   case ALLOCATE:
     // code here
     // refer to the SHAREPAGE and ACCESSPAGE cases to write the code here.
+    // if (copy_from_user((void *)&alloc_req, (void *)arg,
+    //                    sizeof(struct alloc_info))) {
+    //   printk("User didn't send right message.\n");
+    // }
+    //
+    // fixme potential error?
+    // kernel_module_allocate_pages(alloc_req);
+
+    /* Copy allocation request from user space */
     if (copy_from_user((void *)&alloc_req, (void *)arg,
                        sizeof(struct alloc_info))) {
-      printk("User didn't send right message.\n");
+      printk(KERN_ERR "User didn't send right message for ALLOCATE.\n");
+      return -EFAULT;
     }
 
-    // fixme potential error?
-    kernel_module_allocate_pages(alloc_req);
+    /* Debug message */
+    printk(KERN_INFO "IOCTL: allocate(%lx, %d, %d)\n", alloc_req.vaddr,
+           alloc_req.num_pages, alloc_req.write);
+
+    /* Call our allocation function */
+    return kernel_module_allocate_pages(alloc_req);
+    break;
 
     break;
 
   case FREE:
     // code here
     // refer to the SHAREPAGE and ACCESSPAGE cases to write the code here.
+    // if (copy_from_user((void *)&free_req, (void *)arg,
+    //                    sizeof(struct free_info))) {
+    //   printk("User didn't send right message.\n");
+    // }
+    //
+    // // fixme
+    // kernel_module_free_pages(free_req.vaddr);
+    /* Copy free request from user space */
     if (copy_from_user((void *)&free_req, (void *)arg,
                        sizeof(struct free_info))) {
-      printk("User didn't send right message.\n");
+      printk(KERN_ERR "User didn't send right message for FREE.\n");
+      return -EFAULT;
     }
 
-    // fixme
+    /* Debug message */
+    printk(KERN_INFO "IOCTL: free(%lx)\n", free_req.vaddr);
+
+    /* Call our free function */
     kernel_module_free_pages(free_req.vaddr);
     break;
 
   case SHAREPAGE:
     /* Share a page */
-    if (copy_from_user((void *)&sharepage_req, (void *)arg,
-                       sizeof(struct sharepage_info))) {
-      printk("User didn't send right message.\n");
-    }
+    // if (copy_from_user((void *)&sharepage_req, (void *)arg,
+    //                    sizeof(struct sharepage_info))) {
+    //   printk("User didn't send right message.\n");
+    // }
+    //
+    // /* debug message */
+    // printk("IOCTL: sharepage(%lx, %d, %d)\n", sharepage_req.vaddr,
+    //        sharepage_req.client_pid, sharepage_req.write);
+    //
+    // set_shared_page(sharepage_req);
 
-    /* debug message */
-    printk("IOCTL: sharepage(%lx, %d, %d)\n", sharepage_req.vaddr,
-           sharepage_req.client_pid, sharepage_req.write);
-
-    set_shared_page(sharepage_req);
     break;
 
   case ACCESSPAGE:

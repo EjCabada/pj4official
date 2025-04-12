@@ -376,6 +376,12 @@ static int kernel_module_allocate_pages(struct alloc_info alloc_req) {
   // Fill in the allocations[] array with vaddr and num_pages.
   // Then update num_allocations, remaining_allocations, and remaining_pages
   // accordingly.
+  allocations[num_allocations].vaddr = alloc_req.vaddr;
+  allocations[num_allocations].num_pages = alloc_req.num_pages;
+  allocations[num_allocations].write = alloc_req.write;
+  num_allocations++;
+  remaining_allocations--;
+  remaining_pages -= alloc_req.num_pages;
 
   printk(KERN_INFO "Allocated %d page(s) at virtual address %lx \n",
          alloc_req.num_pages, alloc_req.vaddr);
@@ -399,9 +405,44 @@ static void kernel_module_free_pages(unsigned long vaddr) {
     // are freed and the allocation entry is cleared.
     // fixme
 
+    // if (allocations[i].vaddr == vaddr) {
+    //   kernel_module_free_single_page(vaddr);
+    //   printk("page freed\n");
+    //   return;
+    // }
+
     if (allocations[i].vaddr == vaddr) {
-      kernel_module_free_single_page(vaddr);
-      printk("page freed\n");
+      unsigned long current_vaddr = vaddr;
+      int pages_to_free = allocations[i].num_pages;
+
+      /* Free each page in this allocation */
+      for (int j = 0; j < pages_to_free; j++) {
+        /* Free a single page */
+        kernel_module_free_single_page(current_vaddr);
+
+        /* Move to the next page address */
+        current_vaddr += PAGE_SIZE;
+      }
+
+      /* Update our tracking information */
+      remaining_pages += allocations[i].num_pages;
+      remaining_allocations++;
+
+      /* Remove this entry by shifting all later entries */
+      for (int j = i; j < num_allocations - 1; j++) {
+        allocations[j] = allocations[j + 1];
+      }
+
+      /* Update counter */
+      num_allocations--;
+
+      printk(KERN_INFO "Freed %d page(s) starting at virtual address %lx\n",
+             pages_to_free, vaddr);
+      printk("[allocations] current = %d, remaining = %d\n", num_allocations,
+             remaining_allocations);
+      printk("[pages] current = %d, remaining = %d\n", 4096 - remaining_pages,
+             remaining_pages);
+
       return;
     }
   }

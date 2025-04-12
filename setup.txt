@@ -1,0 +1,9 @@
+https://github.com/EjCabada/pj4official.git
+
+cd /Users/ejcabada/Desktop/pj4official
+git init #if not already initialized
+git add .
+git commit -m "Initial commit of project 330pj4"
+git branch -M main
+git remote add origin https://github.com/EjCabada/330pj4.git
+git push -u origin main

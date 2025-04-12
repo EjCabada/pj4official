@@ -150,14 +150,17 @@ static int kernel_module_allocate_single_page(unsigned long vaddr, bool write,
      logical address in the virtual memory space*/
   pte = pte_offset_kernel(pmd, vaddr);
   if (pte_none(*pte)) {
-    printk("No PTE allocated; page must be unmapped.");
-    goto not_in_memory;
+    // printk("No PTE allocated; page must be unmapped.");
+    // goto not_in_memory;
   }
   printk("PTE is allocated. \n");
 
   if (pte_present(*pte)) {
     printk("Page is mapped.\n");
     return -1;
+  } else {
+    printk("Page is not mapped. \n"); // Get a free page for the process
+    goto not_in_memory;
   }
 
   // gfp_t gfp = GFP_KERNEL_ACCOUNT;

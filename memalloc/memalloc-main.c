@@ -150,10 +150,10 @@ static int kernel_module_allocate_single_page(unsigned long vaddr, bool write,
      logical address in the virtual memory space*/
   pte = pte_offset_kernel(pmd, vaddr);
   if (pte_none(*pte)) {
-    printk("No PTE allocated; page must be unmapped.");
+    // printk("No PTE allocated; page must be unmapped.");
     // goto not_in_memory;
   }
-  // printk("PTE is allocated. \n");
+  printk("PTE is allocated. \n");
 
   if (pte_present(*pte)) {
     printk("Page is mapped.\n");
@@ -362,7 +362,7 @@ static int kernel_module_allocate_pages(struct alloc_info alloc_req) {
     ret = kernel_module_allocate_single_page(vaddr, write, 0);
     if (ret == -1) {
       // fixme
-      printk("alloc failed and returned -1, check single_page\n");
+      printk("add something here in the future\n");
       return -1;
     }
 
@@ -374,12 +374,6 @@ static int kernel_module_allocate_pages(struct alloc_info alloc_req) {
   // Fill in the allocations[] array with vaddr and num_pages.
   // Then update num_allocations, remaining_allocations, and remaining_pages
   // accordingly.
-  allocations[num_allocations].vaddr = alloc_req.vaddr;
-  allocations[num_allocations].write = alloc_req.write;
-  allocations[num_allocations].num_pages = alloc_req.num_pages;
-  remaining_pages -= alloc_req.num_pages;
-  num_allocations++;
-  remaining_allocations--;
 
   printk(KERN_INFO "Allocated %d page(s) at virtual address %lx \n",
          alloc_req.num_pages, alloc_req.vaddr);
@@ -496,68 +490,74 @@ static long memalloc_ioctl(struct file *f, unsigned int cmd,
                                        shared_paddr);
 
     break;
+
+  default:
+    printk("Error: incorrect IOCTL command.\n");
+    return -1;
   }
+  return 0;
+}
 
-  /* Required file ops. */
-  static struct file_operations fops = {
-      .owner = THIS_MODULE,
-      .open = memalloc_open,
-      .release = memalloc_release,
-      .unlocked_ioctl = memalloc_ioctl,
-  };
+/* Required file ops. */
+static struct file_operations fops = {
+    .owner = THIS_MODULE,
+    .open = memalloc_open,
+    .release = memalloc_release,
+    .unlocked_ioctl = memalloc_ioctl,
+};
 
-  /* Initialize the module for IOCTL commands */
-  bool memalloc_ioctl_init(void) {
+/* Initialize the module for IOCTL commands */
+bool memalloc_ioctl_init(void) {
 
-    /* Allocate a character device. */
-    if (alloc_chrdev_region(&dev, 0, 1, "memalloc") < 0) {
-      printk("error: couldn't allocate chardev region.\n");
-      return false;
-    }
-    printk("success: allocated chardev region.\n");
-
-    /* Initialize the chardev with my fops. */
-    cdev_init(&vmod_cdev, &fops);
-
-    if (cdev_add(&vmod_cdev, dev, 1) < 0) {
-      printk("error: couldn't add memalloc.\n");
-      goto cdevfailed;
-    }
-    printk("success: added cdev.\n");
-
-    if ((vmod_class = class_create("memalloc_class")) == NULL) {
-      printk("error: couldn't create class.\n");
-      goto cdevfailed;
-    }
-    printk("success: created class.\n");
-
-    if ((device_create(vmod_class, NULL, dev, NULL, "memalloc")) == NULL) {
-      printk("error: couldn't create device.\n");
-      goto classfailed;
-    }
-    printk("success: memalloc device driver inserted.\n");
-
-    return true;
-
-  classfailed:
-    class_destroy(vmod_class);
-  cdevfailed:
-    unregister_chrdev_region(dev, 1);
-
+  /* Allocate a character device. */
+  if (alloc_chrdev_region(&dev, 0, 1, "memalloc") < 0) {
+    printk("error: couldn't allocate chardev region.\n");
     return false;
   }
+  printk("success: allocated chardev region.\n");
 
-  void memalloc_ioctl_teardown(void) {
-    /* Destroy the classes too (IOCTL-specific). */
-    if (vmod_class) {
-      device_destroy(vmod_class, dev);
-      class_destroy(vmod_class);
-    }
-    cdev_del(&vmod_cdev);
-    unregister_chrdev_region(dev, 1);
+  /* Initialize the chardev with my fops. */
+  cdev_init(&vmod_cdev, &fops);
 
-    printk("Removed vmod device driver from host.\n");
+  if (cdev_add(&vmod_cdev, dev, 1) < 0) {
+    printk("error: couldn't add memalloc.\n");
+    goto cdevfailed;
   }
+  printk("success: added cdev.\n");
 
-  module_init(memalloc_module_init);
-  module_exit(memalloc_module_exit);
+  if ((vmod_class = class_create("memalloc_class")) == NULL) {
+    printk("error: couldn't create class.\n");
+    goto cdevfailed;
+  }
+  printk("success: created class.\n");
+
+  if ((device_create(vmod_class, NULL, dev, NULL, "memalloc")) == NULL) {
+    printk("error: couldn't create device.\n");
+    goto classfailed;
+  }
+  printk("success: memalloc device driver inserted.\n");
+
+  return true;
+
+classfailed:
+  class_destroy(vmod_class);
+cdevfailed:
+  unregister_chrdev_region(dev, 1);
+
+  return false;
+}
+
+void memalloc_ioctl_teardown(void) {
+  /* Destroy the classes too (IOCTL-specific). */
+  if (vmod_class) {
+    device_destroy(vmod_class, dev);
+    class_destroy(vmod_class);
+  }
+  cdev_del(&vmod_cdev);
+  unregister_chrdev_region(dev, 1);
+
+  printk("Removed vmod device driver from host.\n");
+}
+
+module_init(memalloc_module_init);
+module_exit(memalloc_module_exit);

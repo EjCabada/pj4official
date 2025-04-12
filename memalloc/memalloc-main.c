@@ -148,6 +148,7 @@ static int kernel_module_allocate_single_page(unsigned long vaddr, bool write,
 
   /* Return pointer to the PTE. pmd is the pointer of PMD, address is the
      logical address in the virtual memory space*/
+  //***
   pte = pte_offset_kernel(pmd, vaddr);
   if (pte_none(*pte)) {
     printk("No PTE allocated; page must be unmapped.");

@@ -436,14 +436,6 @@ static void kernel_module_free_pages(unsigned long vaddr) {
 
       /* Update counter */
       num_allocations--;
-
-      printk(KERN_INFO "Freed %d page(s) starting at virtual address %lx\n",
-             pages_to_free, vaddr);
-      printk("[allocations] current = %d, remaining = %d\n", num_allocations,
-             remaining_allocations);
-      printk("[pages] current = %d, remaining = %d\n", 4096 - remaining_pages,
-             remaining_pages);
-
       return;
     }
   }

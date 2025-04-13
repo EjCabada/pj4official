@@ -233,8 +233,6 @@ static int kernel_module_free_single_page(unsigned long vaddr) {
   }
   // printk("PGD is allocated. \n");
 
-  /* Return pointer to the P4D. pgd is the pointer of PGD, address is the
-     logical address in the virtual memory space.*/
   p4d = p4d_offset(pgd, vaddr);
   if (p4d_none(*p4d) || p4d_bad(*p4d)) {
     // printk("No P4D allocated; page must be unmapped.");
@@ -243,8 +241,6 @@ static int kernel_module_free_single_page(unsigned long vaddr) {
   }
   // printk("P4D is allocated. \n");
 
-  /* Return pointer to the PUD. p4d is the pointer of P4D, address is the
-     logical address in the virtual memory space.*/
   pud = pud_offset(p4d, vaddr);
   if (pud_none(*pud)) {
     // printk("No PUD allocated; page must be unmapped.");
@@ -253,19 +249,13 @@ static int kernel_module_free_single_page(unsigned long vaddr) {
   }
   // printk("PUD is allocated. \n");
 
-  /* Return pointer to the PMD. pud is the pointer of PUD, address is the
-     logical address in the virtual memory space.*/
   pmd = pmd_offset(pud, vaddr);
   if (pmd_none(*pmd)) {
     // printk("No PMD allocated; page must be unmapped.");
-    // goto not_in_memory;pud_of
+    // goto not_in_memory;
     return -1;
   }
 
-  // printk("PMD is allocated. \n");
-
-  /* Return pointer to the PTE. pmd is the pointer of PMD, address is the
-     logical address in the virtual memory space*/
   pte = pte_offset_kernel(pmd, vaddr);
   if (pte_none(*pte)) {
     // printk("No PTE allocated; page must be unmapped.");
@@ -363,7 +353,7 @@ static int kernel_module_allocate_pages(struct alloc_info alloc_req) {
     ret = kernel_module_allocate_single_page(vaddr, write, 0);
     if (ret == -1) {
       // fixme
-      printk("add something here in the future\n");
+      // printk("add something here in the future\n");
       return -1;
     }
 
@@ -375,26 +365,25 @@ static int kernel_module_allocate_pages(struct alloc_info alloc_req) {
   // Fill in the allocations[] array with vaddr and num_pages.
   // Then update num_allocations, remaining_allocations, and remaining_pages
   // accordingly.
+  // fixme
+  // alloccations[] is a alloc_info struct and has allocations[i].vaddr .write
+  // and .num_pages
   allocations[num_allocations].vaddr = alloc_req.vaddr;
-  allocations[num_allocations].num_pages = alloc_req.num_pages;
   allocations[num_allocations].write = alloc_req.write;
+  allocations[num_allocations].num_pages = alloc_req.num_pages;
   num_allocations++;
   remaining_allocations--;
   remaining_pages -= alloc_req.num_pages;
 
-  printk(KERN_INFO "Allocated %d page(s) at virtual address %lx \n",
-         alloc_req.num_pages, alloc_req.vaddr);
-  printk("[allocations] current = %d, remaining = %d\n", num_allocations,
-         remaining_allocations);
-  printk("[pages] current = %d, remaining = %d\n", alloc_req.num_pages,
-         remaining_pages);
+  // printk("reached the end of allocate_pages\n");
+
   return 0;
 }
 
 static void kernel_module_free_pages(unsigned long vaddr) {
   int i;
 
-  printk("Entered freePages with vaddr = %lu\n", vaddr);
+  // printk("Entered freePages with vaddr = %lu\n", vaddr);
 
   // Find the allocation entry
   for (i = 0; i < num_allocations; ++i) {
@@ -404,43 +393,28 @@ static void kernel_module_free_pages(unsigned long vaddr) {
     // are freed and the allocation entry is cleared.
     // fixme
 
-    // if (allocations[i].vaddr == vaddr) {
-    //   kernel_module_free_single_page(vaddr);
-    //   printk("page freed\n");
-    //   return;
-    // }
-
     if (allocations[i].vaddr == vaddr) {
       unsigned long current_vaddr = vaddr;
       int pages_to_free = allocations[i].num_pages;
 
-      /* Free each page in this allocation */
       for (int j = 0; j < pages_to_free; j++) {
-        /* Free a single page */
-        kernel_module_free_single_page(current_vaddr);
 
-        /* Move to the next page address */
+        // printk("entering the j loop\n");
+
+        kernel_module_free_single_page(current_vaddr);
         current_vaddr += PAGE_SIZE;
       }
 
-      /* Update our tracking information */
       remaining_pages += allocations[i].num_pages;
       remaining_allocations++;
 
-      /* Remove this entry by shifting all later entries */
       for (int j = i; j < num_allocations - 1; j++) {
         allocations[j] = allocations[j + 1];
       }
 
-      /* Update counter */
       num_allocations--;
 
-      printk(KERN_INFO "Freed %d page(s) starting at virtual address %lx\n",
-             pages_to_free, vaddr);
-      printk("[allocations] current = %d, remaining = %d\n", num_allocations,
-             remaining_allocations);
-      printk("[pages] current = %d, remaining = %d\n", 4096 - remaining_pages,
-             remaining_pages);
+      // printk("reached the end of free_pages\n");
 
       return;
     }
@@ -480,67 +454,41 @@ static long memalloc_ioctl(struct file *f, unsigned int cmd,
   case ALLOCATE:
     // code here
     // refer to the SHAREPAGE and ACCESSPAGE cases to write the code here.
-    // if (copy_from_user((void *)&alloc_req, (void *)arg,
-    //                    sizeof(struct alloc_info))) {
-    //   printk("User didn't send right message.\n");
-    // }
-    //
-    // fixme potential error?
-    // kernel_module_allocate_pages(alloc_req);
-
-    /* Copy allocation request from user space */
     if (copy_from_user((void *)&alloc_req, (void *)arg,
                        sizeof(struct alloc_info))) {
-      printk(KERN_ERR "User didn't send right message for ALLOCATE.\n");
-      return -EFAULT;
+      printk("User didn't send right message.\n");
     }
 
-    /* Debug message */
-    printk(KERN_INFO "IOCTL: allocate(%lx, %d, %d)\n", alloc_req.vaddr,
-           alloc_req.num_pages, alloc_req.write);
-
-    /* Call our allocation function */
+    // fixme potential error?
     return kernel_module_allocate_pages(alloc_req);
-    break;
 
     break;
 
   case FREE:
     // code here
     // refer to the SHAREPAGE and ACCESSPAGE cases to write the code here.
-    // if (copy_from_user((void *)&free_req, (void *)arg,
-    //                    sizeof(struct free_info))) {
-    //   printk("User didn't send right message.\n");
-    // }
-    //
-    // // fixme
-    // kernel_module_free_pages(free_req.vaddr);
-    /* Copy free request from user space */
     if (copy_from_user((void *)&free_req, (void *)arg,
                        sizeof(struct free_info))) {
-      printk(KERN_ERR "User didn't send right message for FREE.\n");
-      return -EFAULT;
+      printk("User didn't send right message.\n");
     }
 
-    /* Debug message */
-    printk(KERN_INFO "IOCTL: free(%lx)\n", free_req.vaddr);
-
-    /* Call our free function */
+    // fixme
     kernel_module_free_pages(free_req.vaddr);
+
     break;
 
   case SHAREPAGE:
     /* Share a page */
-    // if (copy_from_user((void *)&sharepage_req, (void *)arg,
-    //                    sizeof(struct sharepage_info))) {
-    //   printk("User didn't send right message.\n");
-    // }
-    //
-    // /* debug message */
-    // printk("IOCTL: sharepage(%lx, %d, %d)\n", sharepage_req.vaddr,
-    //        sharepage_req.client_pid, sharepage_req.write);
-    //
-    // set_shared_page(sharepage_req);
+    if (copy_from_user((void *)&sharepage_req, (void *)arg,
+                       sizeof(struct sharepage_info))) {
+      printk("User didn't send right message.\n");
+    }
+
+    /* debug message */
+    printk("IOCTL: sharepage(%lx, %d, %d)\n", sharepage_req.vaddr,
+           sharepage_req.client_pid, sharepage_req.write);
+
+    set_shared_page(sharepage_req);
 
     break;
 

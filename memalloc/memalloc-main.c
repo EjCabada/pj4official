@@ -107,10 +107,9 @@ static int kernel_module_allocate_single_page(unsigned long vaddr, bool write,
 
   pgd = pgd_offset(current->mm, vaddr);
   if (pgd_none(*pgd)) {
-    printk("Error: pgd should always be mapped (something is really
-           wrong !)
-        .\n ");
-        goto not_in_memory;
+    printk(
+        "Error: pgd should always be mapped (something is really wrong!).\n");
+    goto not_in_memory;
   }
   printk("PGD is allocated. \n");
 
@@ -164,12 +163,12 @@ static int kernel_module_allocate_single_page(unsigned long vaddr, bool write,
     printk("Page is not mapped. \n"); // Get a free page for the process
     goto not_in_memory;
   }
-
+  //
   // gfp_t gfp = GFP_KERNEL_ACCOUNT;
-  // void *virt_addr = (void*) get_zeroed_page(gfp);
+  // void *virt_addr = (void *)get_zeroed_page(gfp);
   // if (!virt_addr) {
-  //     printk(KERN_ERR "Failed to allocate memory using vmalloc\n");
-  //     return -ENOMEM;
+  //   printk(KERN_ERR "Failed to allocate memory using vmalloc\n");
+  //   return -ENOMEM;
   // }
 
 not_in_memory:
@@ -436,6 +435,14 @@ static void kernel_module_free_pages(unsigned long vaddr) {
 
       /* Update counter */
       num_allocations--;
+
+      printk(KERN_INFO "Freed %d page(s) starting at virtual address %lx\n",
+             pages_to_free, vaddr);
+      printk("[allocations] current = %d, remaining = %d\n", num_allocations,
+             remaining_allocations);
+      printk("[pages] current = %d, remaining = %d\n", 4096 - remaining_pages,
+             remaining_pages);
+
       return;
     }
   }
@@ -474,36 +481,67 @@ static long memalloc_ioctl(struct file *f, unsigned int cmd,
   case ALLOCATE:
     // code here
     // refer to the SHAREPAGE and ACCESSPAGE cases to write the code here.
+    // if (copy_from_user((void *)&alloc_req, (void *)arg,
+    //                    sizeof(struct alloc_info))) {
+    //   printk("User didn't send right message.\n");
+    // }
+    //
+    // fixme potential error?
+    // kernel_module_allocate_pages(alloc_req);
+
+    /* Copy allocation request from user space */
     if (copy_from_user((void *)&alloc_req, (void *)arg,
                        sizeof(struct alloc_info))) {
-      printk("User didn't send right message.\n");
+      printk(KERN_ERR "User didn't send right message for ALLOCATE.\n");
+      return -EFAULT;
     }
+
+    /* Debug message */
+    printk(KERN_INFO "IOCTL: allocate(%lx, %d, %d)\n", alloc_req.vaddr,
+           alloc_req.num_pages, alloc_req.write);
+
+    /* Call our allocation function */
+    return kernel_module_allocate_pages(alloc_req);
+    break;
+
     break;
 
   case FREE:
     // code here
     // refer to the SHAREPAGE and ACCESSPAGE cases to write the code here.
+    // if (copy_from_user((void *)&free_req, (void *)arg,
+    //                    sizeof(struct free_info))) {
+    //   printk("User didn't send right message.\n");
+    // }
+    //
+    // // fixme
+    // kernel_module_free_pages(free_req.vaddr);
+    /* Copy free request from user space */
     if (copy_from_user((void *)&free_req, (void *)arg,
                        sizeof(struct free_info))) {
-      printk("User didn't send right message.\n");
+      printk(KERN_ERR "User didn't send right message for FREE.\n");
+      return -EFAULT;
     }
 
-    // fixme
+    /* Debug message */
+    printk(KERN_INFO "IOCTL: free(%lx)\n", free_req.vaddr);
+
+    /* Call our free function */
     kernel_module_free_pages(free_req.vaddr);
     break;
 
   case SHAREPAGE:
     /* Share a page */
-    if (copy_from_user((void *)&sharepage_req, (void *)arg,
-                       sizeof(struct sharepage_info))) {
-      printk("User didn't send right message.\n");
-    }
-
-    /* debug message */
-    printk("IOCTL: sharepage(%lx, %d, %d)\n", sharepage_req.vaddr,
-           sharepage_req.client_pid, sharepage_req.write);
-
-    set_shared_page(sharepage_req);
+    // if (copy_from_user((void *)&sharepage_req, (void *)arg,
+    //                    sizeof(struct sharepage_info))) {
+    //   printk("User didn't send right message.\n");
+    // }
+    //
+    // /* debug message */
+    // printk("IOCTL: sharepage(%lx, %d, %d)\n", sharepage_req.vaddr,
+    //        sharepage_req.client_pid, sharepage_req.write);
+    //
+    // set_shared_page(sharepage_req);
 
     break;
 

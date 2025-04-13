@@ -227,10 +227,9 @@ static int kernel_module_free_single_page(unsigned long vaddr) {
   printk("entered freeSinglePage with %lu\n", vaddr);
   pgd = pgd_offset(current->mm, vaddr);
   if (pgd_none(*pgd)) {
-    printk("Error: pgd should always be mapped (something is really
-           wrong !)
-        .\n ");
-        return -1;
+    printk(
+        "Error: pgd should always be mapped (something is really wrong !).\n ");
+    return -1;
   }
   // printk("PGD is allocated. \n");
 

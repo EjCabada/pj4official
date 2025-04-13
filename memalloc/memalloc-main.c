@@ -394,23 +394,26 @@ static void kernel_module_free_pages(unsigned long vaddr) {
     // fixme
 
     if (allocations[i].vaddr == vaddr) {
-      unsigned long current_vaddr = vaddr;
-      int pages_to_free = allocations[i].num_pages;
 
-      for (int j = 0; j < pages_to_free; j++) {
+      // printk("entering the j loop\n");
+      for (int j = 0; j < allocations[i].num_pages; j++) {
 
-        // printk("entering the j loop\n");
-
-        kernel_module_free_single_page(current_vaddr);
-        current_vaddr += PAGE_SIZE;
+        kernel_module_free_single_page(vaddr);
+        vaddr += PAGE_SIZE;
       }
+
+      // printk("finished the j loop\n");
 
       remaining_pages += allocations[i].num_pages;
       remaining_allocations++;
 
-      for (int j = i; j < num_allocations - 1; j++) {
-        allocations[j] = allocations[j + 1];
+      // printk("entering the k loop\n");
+
+      for (int k = i; k < num_allocations - 1; k++) {
+        allocations[k] = allocations[k + 1];
       }
+
+      // printk("exited the k loop\n");
 
       num_allocations--;
 
